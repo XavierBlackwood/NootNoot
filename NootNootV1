@@ -1,0 +1,477 @@
+local Camera = workspace.CurrentCamera
+local Players = game:GetService("Players")
+local RunService = game:GetService("RunService")
+local UserInputService = game:GetService("UserInputService")
+local LocalPlayer = Players.LocalPlayer
+
+local flying = false
+local flySpeed = 50
+local flyThread
+
+local ESP_ENABLED = false
+local ESP = {}
+
+local function createESP(player)
+    local Box = Drawing.new("Square")
+    Box.Visible = false
+    Box.Color = Color3.fromRGB(255, 255, 255)
+    Box.Thickness = 2
+    Box.Transparency = 1
+    
+    ESP[player] = Box
+
+    RunService.RenderStepped:Connect(function()
+        if player.Character and player.Character:FindFirstChild("HumanoidRootPart") and player ~= LocalPlayer then
+            local RootPart = player.Character.HumanoidRootPart
+            local Vector, OnScreen = Camera:WorldToViewportPoint(RootPart.Position)
+
+            if OnScreen then
+                Box.Size = Vector2.new(2000 / Vector.Z, 2500 / Vector.Z)
+                Box.Position = Vector2.new(Vector.X - Box.Size.X / 2, Vector.Y - Box.Size.Y / 2)
+                Box.Visible = ESP_ENABLED
+            else
+                Box.Visible = false
+            end
+        else
+            Box.Visible = false
+        end
+    end)
+end
+
+local function removeESP(player)
+    if ESP[player] then
+        ESP[player]:Remove()
+        ESP[player] = nil
+    end
+end
+
+local function toggleESP()
+    ESP_ENABLED = not ESP_ENABLED
+
+    for _, player in ipairs(Players:GetPlayers()) do
+        if player ~= LocalPlayer then
+            if ESP_ENABLED then
+                createESP(player)
+            else
+                removeESP(player)
+            end
+        end
+    end
+end
+
+-- Создание ESP для каждого игрока при их добавлении
+Players.PlayerAdded:Connect(function(player)
+    createESP(player)
+end)
+
+-- Удаление ESP при удалении игрока
+Players.PlayerRemoving:Connect(function(player)
+    removeESP(player)
+end)
+
+-- Создание ESP для уже существующих игроков
+for _, player in pairs(Players:GetPlayers()) do
+    if player ~= LocalPlayer then
+        createESP(player)
+    end
+end
+
+-- Создание GUI элементов
+local UserInputService = game:GetService("UserInputService")
+local player = Players.LocalPlayer
+
+local ScreenGui = Instance.new("ScreenGui")
+local Panel = Instance.new("Frame")
+
+ScreenGui.Parent = player:WaitForChild("PlayerGui")
+Panel.Parent = ScreenGui
+Panel.BackgroundColor3 = Color3.fromRGB(25, 25, 25)
+Panel.Position = UDim2.new(0.5, -400, 0.5, -150) -- Положение в середине экрана и смещение на половину ширины и высоты
+Panel.Size = UDim2.new(0, 800, 0, 300) -- Размер панели
+Panel.BorderSizePixel = 0
+
+local FlyPanel = Instance.new("Frame")
+FlyPanel.Parent = Panel
+FlyPanel.Size = UDim2.new(1, 0, 0.9, 0)
+FlyPanel.Position = UDim2.new(0, 0, 0.1, 0)
+FlyPanel.BackgroundColor3 = Color3.fromRGB(35, 35, 35)
+FlyPanel.Visible = true
+
+local WallHackPanel = Instance.new("Frame")
+WallHackPanel.Parent = Panel
+WallHackPanel.Size = UDim2.new(1, 0, 0.9, 0)
+WallHackPanel.Position = UDim2.new(0, 0, 0.1, 0)
+WallHackPanel.BackgroundColor3 = Color3.fromRGB(35, 35, 35)
+WallHackPanel.Visible = false
+
+local SettingsPanel = Instance.new("Frame")
+SettingsPanel.Parent = Panel
+SettingsPanel.Size = UDim2.new(1, 0, 0.9, 0)
+SettingsPanel.Position = UDim2.new(0, 0, 0.1, 0)
+SettingsPanel.BackgroundColor3 = Color3.fromRGB(35, 35, 35)
+SettingsPanel.Visible = false
+
+local TeleportationPanel = Instance.new("Frame")
+TeleportationPanel.Parent = Panel
+TeleportationPanel.Size = UDim2.new(1, 0, 0.9, 0)
+TeleportationPanel.Position = UDim2.new(0, 0, 0.1, 0)
+TeleportationPanel.BackgroundColor3 = Color3.fromRGB(35, 35, 35)
+TeleportationPanel.Visible = false
+
+-- Добавление вкладок в панель
+local function switchToPanel(panel)
+    FlyPanel.Visible = false
+    WallHackPanel.Visible = false
+    SettingsPanel.Visible = false
+    TeleportationPanel.Visible = false
+    panel.Visible = true
+end
+
+local FlyTabButton = Instance.new("TextButton")
+FlyTabButton.Parent = Panel
+FlyTabButton.BackgroundColor3 = Color3.fromRGB(65, 65, 65)
+FlyTabButton.Position = UDim2.new(0, 0, 0, 0)
+FlyTabButton.Size = UDim2.new(0.2, 0, 0.1, 0)
+FlyTabButton.Text = "Fly"
+FlyTabButton.TextColor3 = Color3.fromRGB(255, 255, 255)
+FlyTabButton.BorderSizePixel = 0
+FlyTabButton.BackgroundTransparency = 0.2
+FlyTabButton.MouseButton1Click:Connect(function()
+    switchToPanel(FlyPanel)
+end)
+
+local WallHackTabButton = Instance.new("TextButton")
+WallHackTabButton.Parent = Panel
+WallHackTabButton.BackgroundColor3 = Color3.fromRGB(65, 65, 65)
+WallHackTabButton.Position = UDim2.new(0.2, 0, 0, 0)
+WallHackTabButton.Size = UDim2.new(0.2, 0, 0.1, 0)
+WallHackTabButton.Text = "WallHack"
+WallHackTabButton.TextColor3 = Color3.fromRGB(255, 255, 255)
+WallHackTabButton.BorderSizePixel = 0
+WallHackTabButton.BackgroundTransparency = 0.2
+WallHackTabButton.MouseButton1Click:Connect(function()
+    switchToPanel(WallHackPanel)
+end)
+
+local SettingsTabButton = Instance.new("TextButton")
+SettingsTabButton.Parent = Panel
+SettingsTabButton.BackgroundColor3 = Color3.fromRGB(65, 65, 65)
+SettingsTabButton.Position = UDim2.new(0.4, 0, 0, 0)
+SettingsTabButton.Size = UDim2.new(0.2, 0, 0.1, 0)
+SettingsTabButton.Text = "Settings"
+SettingsTabButton.TextColor3 = Color3.fromRGB(255, 255, 255)
+SettingsTabButton.BorderSizePixel = 0
+SettingsTabButton.BackgroundTransparency = 0.2
+SettingsTabButton.MouseButton1Click:Connect(function()
+    switchToPanel(SettingsPanel)
+end)
+
+local TeleportationTabButton = Instance.new("TextButton")
+TeleportationTabButton.Parent = Panel
+TeleportationTabButton.BackgroundColor3 = Color3.fromRGB(65, 65, 65)
+TeleportationTabButton.Position = UDim2.new(0.6, 0, 0, 0)
+TeleportationTabButton.Size = UDim2.new(0.2, 0, 0.1, 0)
+TeleportationTabButton.Text = "ClickWarp"
+TeleportationTabButton.TextColor3 = Color3.fromRGB(255, 255, 255)
+TeleportationTabButton.BorderSizePixel = 0
+TeleportationTabButton.BackgroundTransparency = 0.2
+TeleportationTabButton.MouseButton1Click:Connect(function()
+    switchToPanel(TeleportationPanel)
+end)
+
+-- Создание элементов внутри панелей
+local FlyLabel = Instance.new("TextLabel")
+FlyLabel.Size = UDim2.new(0, 200, 0, 50)
+FlyLabel.Position = UDim2.new(0.25, 0, 0.1, 0)
+FlyLabel.BackgroundColor3 = Color3.fromRGB(25, 25, 25)
+FlyLabel.TextColor3 = Color3.fromRGB(255, 255, 255)
+FlyLabel.Text = "Fly:"
+FlyLabel.Parent = FlyPanel
+
+local FlyToggleButton = Instance.new("TextButton")
+FlyToggleButton.Parent = FlyPanel
+FlyToggleButton.Size = UDim2.new(0, 200, 0, 50)
+FlyToggleButton.Position = UDim2.new(0.25, 0, 0.3, 0)
+FlyToggleButton.BackgroundColor3 = Color3.fromRGB(65, 65, 65)
+FlyToggleButton.TextColor3 = Color3.fromRGB(255, 255, 255)
+FlyToggleButton.Text = "Активировать"
+FlyToggleButton.BorderSizePixel = 0
+
+local NoClipLabel = Instance.new("TextLabel")
+NoClipLabel.Size = UDim2.new(0, 200, 0, 50)
+NoClipLabel.Position = UDim2.new(0.25, 0, 0.5, 0)
+NoClipLabel.BackgroundColor3 = Color3.fromRGB(25, 25, 25)
+NoClipLabel.TextColor3 = Color3.fromRGB(255, 255, 255)
+NoClipLabel.Text = "NoClip:"
+NoClipLabel.Parent = FlyPanel
+
+local NoClipToggleButton = Instance.new("TextButton")
+NoClipToggleButton.Parent = FlyPanel
+NoClipToggleButton.Size = UDim2.new(0, 200, 0, 50)
+NoClipToggleButton.Position = UDim2.new(0.25, 0, 0.7, 0)
+NoClipToggleButton.BackgroundColor3 = Color3.fromRGB(65, 65, 65)
+NoClipToggleButton.TextColor3 = Color3.fromRGB(255, 255, 255)
+NoClipToggleButton.Text = "Активировать"
+NoClipToggleButton.BorderSizePixel = 0
+
+local WallHackLabel = Instance.new("TextLabel")
+WallHackLabel.Size = UDim2.new(0, 200, 0, 50)
+WallHackLabel.Position = UDim2.new(0.25, 0, 0.1, 0)
+WallHackLabel.BackgroundColor3 = Color3.fromRGB(25, 25, 25)
+WallHackLabel.TextColor3 = Color3.fromRGB(255, 255, 255)
+WallHackLabel.Text = "WallHack:"
+WallHackLabel.Parent = WallHackPanel
+
+local WallHackToggleButton = Instance.new("TextButton")
+WallHackToggleButton.Parent = WallHackPanel
+WallHackToggleButton.Size = UDim2.new(0, 200, 0, 50)
+WallHackToggleButton.Position = UDim2.new(0.25, 0, 0.3, 0)
+WallHackToggleButton.BackgroundColor3 = Color3.fromRGB(65, 65, 65)
+WallHackToggleButton.TextColor3 = Color3.fromRGB(255, 255, 255)
+WallHackToggleButton.Text = "Активировать"
+WallHackToggleButton.BorderSizePixel = 0
+
+local SettingsLabel = Instance.new("TextLabel")
+SettingsLabel.Size = UDim2.new(0, 200, 0, 50)
+SettingsLabel.Position = UDim2.new(0.25, 0, 0.1, 0)
+SettingsLabel.BackgroundColor3 = Color3.fromRGB(25, 25, 25)
+SettingsLabel.TextColor3 = Color3.fromRGB(255, 255, 255)
+SettingsLabel.Text = "Settings:"
+SettingsLabel.Parent = SettingsPanel
+
+local TeleportationLabel = Instance.new("TextLabel")
+TeleportationLabel.Size = UDim2.new(0, 200, 0, 50)
+TeleportationLabel.Position = UDim2.new(0.25, 0, 0.1, 0)
+TeleportationLabel.BackgroundColor3 = Color3.fromRGB(25, 25, 25)
+TeleportationLabel.TextColor3 = Color3.fromRGB(255, 255, 255)
+TeleportationLabel.Text = "ClickWarp:"
+TeleportationLabel.Parent = TeleportationPanel
+
+local TeleportationToggleButton = Instance.new("TextButton")
+TeleportationToggleButton.Parent = TeleportationPanel
+TeleportationToggleButton.Size = UDim2.new(0, 200, 0, 50)
+TeleportationToggleButton.Position = UDim2.new(0.25, 0, 0.3, 0)
+TeleportationToggleButton.BackgroundColor3 = Color3.fromRGB(65, 65, 65)
+TeleportationToggleButton.TextColor3 = Color3.fromRGB(255, 255, 255)
+TeleportationToggleButton.Text = "Активировать"
+TeleportationToggleButton.BorderSizePixel = 0
+
+local WalkspeedLabel = Instance.new("TextLabel")
+WalkspeedLabel.Size = UDim2.new(0, 200, 0, 50)
+WalkspeedLabel.Position = UDim2.new(0.25, 0, 0.3, 0)
+WalkspeedLabel.BackgroundColor3 = Color3.fromRGB(25, 25, 25)
+WalkspeedLabel.TextColor3 = Color3.fromRGB(255, 255, 255)
+WalkspeedLabel.Text = "Walkspeed:"
+WalkspeedLabel.Parent = SettingsPanel
+
+local WalkspeedTextBox = Instance.new("TextBox")
+WalkspeedTextBox.Parent = SettingsPanel
+WalkspeedTextBox.Size = UDim2.new(0, 100, 0, 30)
+WalkspeedTextBox.Position = UDim2.new(0.6, -50, 0.3, 0)
+WalkspeedTextBox.BackgroundColor3 = Color3.fromRGB(65, 65, 65)
+WalkspeedTextBox.TextColor3 = Color3.fromRGB(255, 255, 255)
+WalkspeedTextBox.Text = tostring(LocalPlayer.Character.Humanoid.WalkSpeed)
+WalkspeedTextBox.BorderSizePixel = 0
+
+local JumppowerLabel = Instance.new("TextLabel")
+JumppowerLabel.Size = UDim2.new(0, 200, 0, 50)
+JumppowerLabel.Position = UDim2.new(0.25, 0, 0.5, 0)
+JumppowerLabel.BackgroundColor3 = Color3.fromRGB(25, 25, 25)
+JumppowerLabel.TextColor3 = Color3.fromRGB(255, 255, 255)
+JumppowerLabel.Text = "Jumppower:"
+JumppowerLabel.Parent = SettingsPanel
+
+local JumppowerTextBox = Instance.new("TextBox")
+JumppowerTextBox.Parent = SettingsPanel
+JumppowerTextBox.Size = UDim2.new(0, 100, 0, 30)
+JumppowerTextBox.Position = UDim2.new(0.6, -50, 0.5, 0)
+JumppowerTextBox.BackgroundColor3 = Color3.fromRGB(65, 65, 65)
+JumppowerTextBox.TextColor3 = Color3.fromRGB(255, 255, 255)
+JumppowerTextBox.Text = tostring(LocalPlayer.Character.Humanoid.JumpPower)
+JumppowerTextBox.BorderSizePixel = 0
+
+local FlyspeedLabel = Instance.new("TextLabel")
+FlyspeedLabel.Size = UDim2.new(0, 200, 0, 50)
+FlyspeedLabel.Position = UDim2.new(0.25, 0, 0.7, 0)
+FlyspeedLabel.BackgroundColor3 = Color3.fromRGB(25, 25, 25)
+FlyspeedLabel.TextColor3 = Color3.fromRGB(255, 255, 255)
+FlyspeedLabel.Text = "FlySpeed:"
+FlyspeedLabel.Parent = SettingsPanel
+
+local FlyspeedTextBox = Instance.new("TextBox")
+FlyspeedTextBox.Parent = SettingsPanel
+FlyspeedTextBox.Size = UDim2.new(0, 100, 0, 30)
+FlyspeedTextBox.Position = UDim2.new(0.6, -50, 0.7, 0)
+FlyspeedTextBox.BackgroundColor3 = Color3.fromRGB(65, 65, 65)
+FlyspeedTextBox.TextColor3 = Color3.fromRGB(255, 255, 255)
+FlyspeedTextBox.Text = "50"  -- Начальное значение
+FlyspeedTextBox.BorderSizePixel = 0
+
+
+
+local function setWalkspeed(walkspeed)
+    LocalPlayer.Character.Humanoid.WalkSpeed = walkspeed
+end
+
+local function setJumppower(jumppower)
+    LocalPlayer.Character.Humanoid.JumpPower = jumppower
+end
+
+WalkspeedTextBox.FocusLost:Connect(function(enterPressed)
+    if enterPressed then
+        local newWalkspeed = tonumber(WalkspeedTextBox.Text)
+        if newWalkspeed then
+            setWalkspeed(newWalkspeed)
+        else
+            WalkspeedTextBox.Text = tostring(LocalPlayer.Character.Humanoid.WalkSpeed)
+        end
+    end
+end)
+
+JumppowerTextBox.FocusLost:Connect(function(enterPressed)
+    if enterPressed then
+        local newJumppower = tonumber(JumppowerTextBox.Text)
+        if newJumppower then
+            setJumppower(newJumppower)
+        else
+            JumppowerTextBox.Text = tostring(LocalPlayer.Character.Humanoid.JumpPower)
+        end
+    end
+end)
+
+
+-- Реализация функций для Fly, NoClip и ClickWarp
+local flyEnabled = false
+local noClipEnabled = false
+local teleportationEnabled = false
+
+local function setFly(enabled)
+    local character = LocalPlayer.Character
+    if character then
+        local humanoidRootPart = character:FindFirstChild("HumanoidRootPart")
+        if humanoidRootPart then
+            if enabled then
+                local bodyVelocity = Instance.new("BodyVelocity")
+                bodyVelocity.Velocity = Vector3.new(0, 0, 0)
+                bodyVelocity.MaxForce = Vector3.new(100000, 100000, 100000)
+                bodyVelocity.Parent = humanoidRootPart
+
+                local function onFlyUpdate()
+                    while flying do
+                        local velocity = Vector3.new(0, 0, 0)
+
+                        if UserInputService:IsKeyDown(Enum.KeyCode.W) then
+                            velocity = velocity + (workspace.CurrentCamera.CFrame.LookVector * flySpeed)
+                        end
+                        if UserInputService:IsKeyDown(Enum.KeyCode.S) then
+                            velocity = velocity - (workspace.CurrentCamera.CFrame.LookVector * flySpeed)
+                        end
+                        if UserInputService:IsKeyDown(Enum.KeyCode.A) then
+                            velocity = velocity - (workspace.CurrentCamera.CFrame.RightVector * flySpeed)
+                        end
+                        if UserInputService:IsKeyDown(Enum.KeyCode.D) then
+                            velocity = velocity + (workspace.CurrentCamera.CFrame.RightVector * flySpeed)
+                        end
+                        if UserInputService:IsKeyDown(Enum.KeyCode.Space) then
+                            velocity = velocity + Vector3.new(0, flySpeed, 0)
+                        end
+                        if UserInputService:IsKeyDown(Enum.KeyCode.LeftControl) then
+                            velocity = velocity - Vector3.new(0, flySpeed, 0)
+                        end
+
+                        bodyVelocity.Velocity = velocity
+
+                        RunService.RenderStepped:Wait()
+                    end
+
+                    bodyVelocity:Destroy()
+                end
+
+                flying = true
+                flyThread = coroutine.create(onFlyUpdate)
+                coroutine.resume(flyThread)
+            else
+                flying = false
+            end
+        end
+    end
+end
+
+
+
+local function setNoClip(enabled)
+    if enabled then
+        -- Включить режим NoClip
+        RunService.Stepped:Connect(function()
+            local character = LocalPlayer.Character
+            if character then
+                for _, child in pairs(character:GetDescendants()) do
+                    if child:IsA("BasePart") then
+                        child.CanCollide = false
+                    end
+                end
+            end
+        end)
+    else
+        -- Отключить режим NoClip
+        local character = LocalPlayer.Character
+        if character then
+            for _, child in pairs(character:GetDescendants()) do
+                if child:IsA("BasePart") then
+                    child.CanCollide = true
+                end
+            end
+        end
+    end
+end
+
+local function teleportPlayer(position)
+    local character = LocalPlayer.Character
+    if character and character:FindFirstChild("HumanoidRootPart") then
+        character.HumanoidRootPart.CFrame = CFrame.new(position)
+    end
+end
+
+local function handleTeleportation(input)
+    if input.UserInputType == Enum.UserInputType.MouseButton1 and teleportationEnabled then
+        local mouse = LocalPlayer:GetMouse()
+        local target = mouse.Hit
+        if target then
+            teleportPlayer(target.p)
+        end
+    end
+end
+
+UserInputService.InputBegan:Connect(handleTeleportation)
+
+FlyToggleButton.MouseButton1Click:Connect(function()
+    flying = not flying
+    setFly(flying)
+    FlyToggleButton.Text = flying and "Деактивировать" or "Активировать"
+end)
+
+
+NoClipToggleButton.MouseButton1Click:Connect(function()
+    noClipEnabled = not noClipEnabled
+    setNoClip(noClipEnabled)
+    NoClipToggleButton.Text = noClipEnabled and "Деактивировать" or "Активировать"
+end)
+
+TeleportationToggleButton.MouseButton1Click:Connect(function()
+    teleportationEnabled = not teleportationEnabled
+    TeleportationToggleButton.Text = teleportationEnabled and "Деактивировать" or "Активировать"
+end)
+
+-- Управление отображением GUI
+UserInputService.InputBegan:Connect(function(input, gameProcessed)
+    if not gameProcessed then
+        if input.KeyCode == Enum.KeyCode.Insert then
+            ScreenGui.Enabled = not ScreenGui.Enabled
+        end
+    end
+end)
+
+WallHackToggleButton.MouseButton1Click:Connect(function()
+    toggleESP()
+    WallHackToggleButton.Text = ESP_ENABLED and "Деактивировать" or "Активировать"
+end)
