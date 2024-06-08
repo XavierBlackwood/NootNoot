@@ -425,6 +425,7 @@ local function setNoClip(enabled)
     end
 end
 
+
 local function teleportPlayer(position)
     local character = LocalPlayer.Character
     if character and character:FindFirstChild("HumanoidRootPart") then
