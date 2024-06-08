@@ -400,22 +400,19 @@ end
 
 
 local function setNoClip(enabled)
-    if enabled then
-        -- Включить режим NoClip
-        RunService.Stepped:Connect(function()
-            local character = LocalPlayer.Character
-            if character then
+    local character = LocalPlayer.Character
+    if character then
+        if enabled then
+            -- Включить режим NoClip
+            RunService.Stepped:Connect(function()
                 for _, child in pairs(character:GetDescendants()) do
                     if child:IsA("BasePart") then
                         child.CanCollide = false
                     end
                 end
-            end
-        end)
-    else
-        -- Отключить режим NoClip
-        local character = LocalPlayer.Character
-        if character then
+            end)
+        else
+            -- Отключить режим NoClip
             for _, child in pairs(character:GetDescendants()) do
                 if child:IsA("BasePart") then
                     child.CanCollide = true
@@ -424,6 +421,7 @@ local function setNoClip(enabled)
         end
     end
 end
+
 
 
 local function teleportPlayer(position)
