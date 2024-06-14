@@ -1,8 +1,140 @@
+-- Define variables
 local Camera = workspace.CurrentCamera
 local Players = game:GetService("Players")
 local RunService = game:GetService("RunService")
 local UserInputService = game:GetService("UserInputService")
+local TweenService = game:GetService("TweenService")
 local LocalPlayer = Players.LocalPlayer
+local Holding = false
+local IsAiming = false
+local ClosestPlayer = nil
+
+_G.AimbotEnabled = true
+_G.TeamCheck = false -- If set to true then the script would only lock your aim at enemy team members.
+_G.AimPart = "Head" -- Where the aimbot script would lock at.
+_G.Sensitivity = 0 -- How many seconds it takes for the aimbot script to officially lock onto the target's aimpart.
+
+_G.CircleSides = 64 -- How many sides the FOV circle would have.
+_G.CircleColor = Color3.fromRGB(255, 255, 255) -- (RGB) Color that the FOV circle would appear as.
+_G.CircleTransparency = 0.7 -- Transparency of the circle.
+_G.CircleRadius = 80 -- The radius of the circle / FOV.
+_G.CircleFilled = false -- Determines whether or not the circle is filled.
+_G.CircleVisible = true -- Determines whether or not the circle is visible.
+_G.CircleThickness = 0 -- The thickness of the circle.
+
+local FOVCircle = Drawing.new("Circle")
+FOVCircle.Position = Vector2.new(Camera.ViewportSize.X / 2, Camera.ViewportSize.Y / 2)
+FOVCircle.Radius = _G.CircleRadius
+FOVCircle.Filled = _G.CircleFilled
+FOVCircle.Color = _G.CircleColor
+FOVCircle.Visible = _G.CircleVisible
+FOVCircle.Radius = _G.CircleRadius
+FOVCircle.Transparency = _G.CircleTransparency
+FOVCircle.NumSides = _G.CircleSides
+FOVCircle.Thickness = _G.CircleThickness
+
+-- Function to get players in FOV
+local function GetPlayersInFOV()
+    local PlayersInFOV = {}
+
+    for _, v in next, Players:GetPlayers() do
+        if v ~= LocalPlayer then
+            if _G.TeamCheck then
+                if v.Team ~= LocalPlayer.Team then
+                    local Character = v.Character
+                    if Character and Character:FindFirstChild("HumanoidRootPart") and Character:FindFirstChild("Humanoid") and Character.Humanoid.Health > 0 then
+                        local ScreenPoint = Camera:WorldToScreenPoint(Character.HumanoidRootPart.Position)
+                        local VectorDistance = (Vector2.new(UserInputService:GetMouseLocation().X, UserInputService:GetMouseLocation().Y) - Vector2.new(ScreenPoint.X, ScreenPoint.Y)).Magnitude
+
+                        if VectorDistance < _G.CircleRadius then
+                            table.insert(PlayersInFOV, v)
+                        end
+                    end
+                end
+            else
+                local Character = v.Character
+                if Character and Character:FindFirstChild("HumanoidRootPart") and Character:FindFirstChild("Humanoid") and Character.Humanoid.Health > 0 then
+                    local ScreenPoint = Camera:WorldToScreenPoint(Character.HumanoidRootPart.Position)
+                    local VectorDistance = (Vector2.new(UserInputService:GetMouseLocation().X, UserInputService:GetMouseLocation().Y) - Vector2.new(ScreenPoint.X, ScreenPoint.Y)).Magnitude
+
+                    if VectorDistance < _G.CircleRadius then
+                        table.insert(PlayersInFOV, v)
+                    end
+                end
+            end
+        end
+    end
+
+    return PlayersInFOV
+end
+
+UserInputService.InputBegan:Connect(function(Input)
+    if Input.KeyCode == Enum.KeyCode.LeftAlt then
+        Holding = true
+    end
+end)
+
+UserInputService.InputEnded:Connect(function(Input)
+    if Input.KeyCode == Enum.KeyCode.LeftAlt then
+        Holding = false
+        IsAiming = false  -- Reset aiming state on release
+    end
+end)
+
+-- RenderStepped function to handle aimbot logic
+RunService.RenderStepped:Connect(function()
+    FOVCircle.Position = Vector2.new(UserInputService:GetMouseLocation().X, UserInputService:GetMouseLocation().Y)
+    FOVCircle.Radius = _G.CircleRadius
+    FOVCircle.Filled = _G.CircleFilled
+    FOVCircle.Color = _G.CircleColor
+    FOVCircle.Visible = _G.CircleVisible
+    FOVCircle.Radius = _G.CircleRadius
+    FOVCircle.Transparency = _G.CircleTransparency
+    FOVCircle.NumSides = _G.CircleSides
+    FOVCircle.Thickness = _G.CircleThickness
+
+    if Holding and _G.AimbotEnabled then
+        if not IsAiming then
+            local PlayersInFOV = GetPlayersInFOV()
+            ClosestPlayer = nil
+            local ClosestDistance = math.huge
+
+            -- Find closest player in FOV
+            for _, Player in ipairs(PlayersInFOV) do
+                local Character = Player.Character
+                if Character and Character[_G.AimPart] then
+                    local ScreenPoint = Camera:WorldToScreenPoint(Character[_G.AimPart].Position)
+                    local VectorDistance = (Vector2.new(UserInputService:GetMouseLocation().X, UserInputService:GetMouseLocation().Y) - Vector2.new(ScreenPoint.X, ScreenPoint.Y)).Magnitude
+
+                    if VectorDistance < ClosestDistance then
+                        ClosestPlayer = Player
+                        ClosestDistance = VectorDistance
+                    end
+                end
+            end
+
+            -- Aim at closest player
+            if ClosestPlayer then
+                IsAiming = true
+                local Character = ClosestPlayer.Character
+                if Character and Character[_G.AimPart] then
+                    TweenService:Create(Camera, TweenInfo.new(_G.Sensitivity, Enum.EasingStyle.Sine, Enum.EasingDirection.Out), {CFrame = CFrame.new(Camera.CFrame.Position, Character[_G.AimPart].Position)}):Play()
+                end
+            end
+        else
+            -- Continue aiming at current ClosestPlayer
+            if ClosestPlayer then
+                local Character = ClosestPlayer.Character
+                if Character and Character[_G.AimPart] then
+                    TweenService:Create(Camera, TweenInfo.new(_G.Sensitivity, Enum.EasingStyle.Sine, Enum.EasingDirection.Out), {CFrame = CFrame.new(Camera.CFrame.Position, Character[_G.AimPart].Position)}):Play()
+                end
+            end
+        end
+    else
+        IsAiming = false  -- Reset aiming state if not holding
+    end
+end)
+
 
 local flying = false
 local flySpeed = 50
@@ -17,26 +149,96 @@ local function createESP(player)
     Box.Color = Color3.fromRGB(255, 255, 255)
     Box.Thickness = 2
     Box.Transparency = 1
-    
-    ESP[player] = Box
+
+    local HealthText = Drawing.new("Text")
+    HealthText.Visible = false
+    HealthText.Color = Color3.fromRGB(255, 255, 255)
+    HealthText.Size = 16
+    HealthText.Center = true
+    HealthText.Outline = true
+    HealthText.OutlineColor = Color3.fromRGB(0, 0, 0)
+
+    local WeaponText = Drawing.new("Text")
+    WeaponText.Visible = false
+    WeaponText.Color = Color3.fromRGB(255, 255, 255)
+    WeaponText.Size = 14
+    WeaponText.Center = true
+    WeaponText.Outline = true
+    WeaponText.OutlineColor = Color3.fromRGB(0, 0, 0)
+
+    local NameText = Drawing.new("Text")
+    NameText.Visible = false
+    NameText.Color = Color3.fromRGB(255, 255, 255)
+    NameText.Size = 18
+    NameText.Center = true
+    NameText.Outline = true
+    NameText.OutlineColor = Color3.fromRGB(0, 0, 0)
+    NameText.Text = player.Name
+
+    ESP[player] = {
+        Box = Box,
+        HealthText = HealthText,
+        WeaponText = WeaponText,
+        NameText = NameText,
+        LastEquipped = nil,
+        TextOffset = Vector2.new(0, 0) -- Offset for WeaponText relative to player
+    }
 
     RunService.RenderStepped:Connect(function()
-        if player.Character and player.Character:FindFirstChild("HumanoidRootPart") and player ~= LocalPlayer then
+        if player.Character and player.Character:FindFirstChild("HumanoidRootPart") and player.Character:FindFirstChild("Humanoid") and player ~= LocalPlayer then
             local RootPart = player.Character.HumanoidRootPart
+            local Humanoid = player.Character.Humanoid
+
             local Vector, OnScreen = Camera:WorldToViewportPoint(RootPart.Position)
 
             if OnScreen then
+                -- Update box size and position
                 Box.Size = Vector2.new(2000 / Vector.Z, 2500 / Vector.Z)
                 Box.Position = Vector2.new(Vector.X - Box.Size.X / 2, Vector.Y - Box.Size.Y / 2)
                 Box.Visible = ESP_ENABLED
+
+                -- Update health text
+                local hp = Humanoid.Health
+                local maxHp = Humanoid.MaxHealth
+                local hpDisplay = string.format("%d / %d", hp, maxHp)
+
+                HealthText.Text = hpDisplay
+                HealthText.Position = Vector2.new(Vector.X, Vector.Y + Box.Size.Y / 2 + 20) -- Adjust position for health text
+                HealthText.Visible = ESP_ENABLED
+
+                -- Update weapon text (current item in hand)
+                local currentWeapon = Humanoid and Humanoid.Parent and Humanoid.Parent:FindFirstChildOfClass("Tool")
+                if currentWeapon then
+                    local weaponName = currentWeapon.Name
+                    WeaponText.Text = weaponName
+                    WeaponText.Position = Vector2.new(Vector.X, Vector.Y + Box.Size.Y / 2 + 40) -- Adjust position for weapon text
+                    WeaponText.Visible = ESP_ENABLED
+                    ESP[player].LastEquipped = weaponName
+                else
+                    WeaponText.Visible = false
+                    ESP[player].LastEquipped = nil
+                end
+
+                -- Update name text
+                NameText.Position = Vector2.new(Vector.X, Vector.Y - Box.Size.Y / 2 - 20) -- Position above the ESP box
+                NameText.Visible = ESP_ENABLED
             else
                 Box.Visible = false
+                HealthText.Visible = false
+                WeaponText.Visible = false
+                NameText.Visible = false
+                ESP[player].LastEquipped = nil
             end
         else
             Box.Visible = false
+            HealthText.Visible = false
+            WeaponText.Visible = false
+            NameText.Visible = false
+            ESP[player].LastEquipped = nil
         end
     end)
 end
+
 
 local function removeESP(player)
     if ESP[player] then
@@ -89,6 +291,8 @@ Panel.BackgroundColor3 = Color3.fromRGB(25, 25, 25)
 Panel.Position = UDim2.new(0.5, -400, 0.5, -150) -- Положение в середине экрана и смещение на половину ширины и высоты
 Panel.Size = UDim2.new(0, 800, 0, 300) -- Размер панели
 Panel.BorderSizePixel = 0
+Panel.BackgroundTransparency = 0.5 -- Example transparency value (adjust as needed)
+
 
 local FlyPanel = Instance.new("Frame")
 FlyPanel.Parent = Panel
@@ -96,6 +300,7 @@ FlyPanel.Size = UDim2.new(1, 0, 0.9, 0)
 FlyPanel.Position = UDim2.new(0, 0, 0.1, 0)
 FlyPanel.BackgroundColor3 = Color3.fromRGB(35, 35, 35)
 FlyPanel.Visible = true
+FlyPanel.BackgroundTransparency = 0.5
 
 local WallHackPanel = Instance.new("Frame")
 WallHackPanel.Parent = Panel
@@ -103,6 +308,17 @@ WallHackPanel.Size = UDim2.new(1, 0, 0.9, 0)
 WallHackPanel.Position = UDim2.new(0, 0, 0.1, 0)
 WallHackPanel.BackgroundColor3 = Color3.fromRGB(35, 35, 35)
 WallHackPanel.Visible = false
+WallHackPanel.BackgroundTransparency = 0.5
+
+
+local AimBotPanel = Instance.new("Frame")
+AimBotPanel.Parent = Panel
+AimBotPanel.Size = UDim2.new(1, 0, 0.9, 0)
+AimBotPanel.Position = UDim2.new(0, 0, 0.1, 0)
+AimBotPanel.BackgroundColor3 = Color3.fromRGB(35, 35, 35)
+AimBotPanel.Visible = false
+AimBotPanel.BackgroundTransparency = 0.5
+
 
 local SettingsPanel = Instance.new("Frame")
 SettingsPanel.Parent = Panel
@@ -110,6 +326,7 @@ SettingsPanel.Size = UDim2.new(1, 0, 0.9, 0)
 SettingsPanel.Position = UDim2.new(0, 0, 0.1, 0)
 SettingsPanel.BackgroundColor3 = Color3.fromRGB(35, 35, 35)
 SettingsPanel.Visible = false
+SettingsPanel.BackgroundTransparency = 0.5
 
 local TeleportationPanel = Instance.new("Frame")
 TeleportationPanel.Parent = Panel
@@ -117,15 +334,18 @@ TeleportationPanel.Size = UDim2.new(1, 0, 0.9, 0)
 TeleportationPanel.Position = UDim2.new(0, 0, 0.1, 0)
 TeleportationPanel.BackgroundColor3 = Color3.fromRGB(35, 35, 35)
 TeleportationPanel.Visible = false
+TeleportationPanel.BackgroundTransparency = 0.5
 
--- Добавление вкладок в панель
+
 local function switchToPanel(panel)
     FlyPanel.Visible = false
     WallHackPanel.Visible = false
+    AimBotPanel.Visible = false
     SettingsPanel.Visible = false
     TeleportationPanel.Visible = false
     panel.Visible = true
 end
+
 
 local FlyTabButton = Instance.new("TextButton")
 FlyTabButton.Parent = Panel
@@ -135,7 +355,7 @@ FlyTabButton.Size = UDim2.new(0.2, 0, 0.1, 0)
 FlyTabButton.Text = "Fly"
 FlyTabButton.TextColor3 = Color3.fromRGB(255, 255, 255)
 FlyTabButton.BorderSizePixel = 0
-FlyTabButton.BackgroundTransparency = 0.2
+FlyTabButton.BackgroundTransparency = 0.5
 FlyTabButton.MouseButton1Click:Connect(function()
     switchToPanel(FlyPanel)
 end)
@@ -148,9 +368,23 @@ WallHackTabButton.Size = UDim2.new(0.2, 0, 0.1, 0)
 WallHackTabButton.Text = "WallHack"
 WallHackTabButton.TextColor3 = Color3.fromRGB(255, 255, 255)
 WallHackTabButton.BorderSizePixel = 0
-WallHackTabButton.BackgroundTransparency = 0.2
+WallHackTabButton.BackgroundTransparency = 0.5
 WallHackTabButton.MouseButton1Click:Connect(function()
     switchToPanel(WallHackPanel)
+end)
+
+
+local AimBotTabButton = Instance.new("TextButton")
+AimBotTabButton.Parent = Panel
+AimBotTabButton.BackgroundColor3 = Color3.fromRGB(65, 65, 65)
+AimBotTabButton.Position = UDim2.new(0.8, 0, 0, 0)
+AimBotTabButton.Size = UDim2.new(0.2, 0, 0.1, 0)
+AimBotTabButton.Text = "AimBot"
+AimBotTabButton.TextColor3 = Color3.fromRGB(255, 255, 255)
+AimBotTabButton.BorderSizePixel = 0
+AimBotTabButton.BackgroundTransparency = 0.5
+AimBotTabButton.MouseButton1Click:Connect(function()
+    switchToPanel(AimBotPanel)
 end)
 
 local SettingsTabButton = Instance.new("TextButton")
@@ -161,7 +395,7 @@ SettingsTabButton.Size = UDim2.new(0.2, 0, 0.1, 0)
 SettingsTabButton.Text = "Settings"
 SettingsTabButton.TextColor3 = Color3.fromRGB(255, 255, 255)
 SettingsTabButton.BorderSizePixel = 0
-SettingsTabButton.BackgroundTransparency = 0.2
+SettingsTabButton.BackgroundTransparency = 0.5
 SettingsTabButton.MouseButton1Click:Connect(function()
     switchToPanel(SettingsPanel)
 end)
@@ -174,7 +408,7 @@ TeleportationTabButton.Size = UDim2.new(0.2, 0, 0.1, 0)
 TeleportationTabButton.Text = "ClickWarp"
 TeleportationTabButton.TextColor3 = Color3.fromRGB(255, 255, 255)
 TeleportationTabButton.BorderSizePixel = 0
-TeleportationTabButton.BackgroundTransparency = 0.2
+TeleportationTabButton.BackgroundTransparency = 0.5
 TeleportationTabButton.MouseButton1Click:Connect(function()
     switchToPanel(TeleportationPanel)
 end)
@@ -187,6 +421,7 @@ FlyLabel.BackgroundColor3 = Color3.fromRGB(25, 25, 25)
 FlyLabel.TextColor3 = Color3.fromRGB(255, 255, 255)
 FlyLabel.Text = "Fly:"
 FlyLabel.Parent = FlyPanel
+FlyLabel.BackgroundTransparency = 0.5
 
 local FlyToggleButton = Instance.new("TextButton")
 FlyToggleButton.Parent = FlyPanel
@@ -196,6 +431,7 @@ FlyToggleButton.BackgroundColor3 = Color3.fromRGB(65, 65, 65)
 FlyToggleButton.TextColor3 = Color3.fromRGB(255, 255, 255)
 FlyToggleButton.Text = "Активировать"
 FlyToggleButton.BorderSizePixel = 0
+FlyToggleButton.BackgroundTransparency = 0.5
 
 local NoClipLabel = Instance.new("TextLabel")
 NoClipLabel.Size = UDim2.new(0, 200, 0, 50)
@@ -204,6 +440,7 @@ NoClipLabel.BackgroundColor3 = Color3.fromRGB(25, 25, 25)
 NoClipLabel.TextColor3 = Color3.fromRGB(255, 255, 255)
 NoClipLabel.Text = "NoClip:"
 NoClipLabel.Parent = FlyPanel
+NoClipLabel.BackgroundTransparency = 0.5
 
 local NoClipToggleButton = Instance.new("TextButton")
 NoClipToggleButton.Parent = FlyPanel
@@ -213,6 +450,7 @@ NoClipToggleButton.BackgroundColor3 = Color3.fromRGB(65, 65, 65)
 NoClipToggleButton.TextColor3 = Color3.fromRGB(255, 255, 255)
 NoClipToggleButton.Text = "Активировать"
 NoClipToggleButton.BorderSizePixel = 0
+NoClipToggleButton.BackgroundTransparency = 0.5
 
 local WallHackLabel = Instance.new("TextLabel")
 WallHackLabel.Size = UDim2.new(0, 200, 0, 50)
@@ -221,6 +459,16 @@ WallHackLabel.BackgroundColor3 = Color3.fromRGB(25, 25, 25)
 WallHackLabel.TextColor3 = Color3.fromRGB(255, 255, 255)
 WallHackLabel.Text = "WallHack:"
 WallHackLabel.Parent = WallHackPanel
+WallHackLabel.BackgroundTransparency = 0.5
+
+local AimBotLabel = Instance.new("TextLabel")
+AimBotLabel.Size = UDim2.new(0, 200, 0, 50)
+AimBotLabel.Position = UDim2.new(0.25, 0, 0.1, 0)
+AimBotLabel.BackgroundColor3 = Color3.fromRGB(25, 25, 25)
+AimBotLabel.TextColor3 = Color3.fromRGB(255, 255, 255)
+AimBotLabel.Text = "AimBot:"
+AimBotLabel.Parent = AimBotPanel
+AimBotLabel.BackgroundTransparency = 0.5
 
 local WallHackToggleButton = Instance.new("TextButton")
 WallHackToggleButton.Parent = WallHackPanel
@@ -230,6 +478,23 @@ WallHackToggleButton.BackgroundColor3 = Color3.fromRGB(65, 65, 65)
 WallHackToggleButton.TextColor3 = Color3.fromRGB(255, 255, 255)
 WallHackToggleButton.Text = "Активировать"
 WallHackToggleButton.BorderSizePixel = 0
+WallHackToggleButton.BackgroundTransparency = 0.5
+
+local AimbotToggle = Instance.new("TextButton")
+AimbotToggle.Parent = AimBotPanel
+AimbotToggle.BackgroundColor3 = Color3.fromRGB(65, 65, 65)
+AimbotToggle.Position = UDim2.new(0.25, 0, 0.3, 0)
+AimbotToggle.Size = UDim2.new(0, 200, 0, 50)
+AimbotToggle.Text = "Aimbot: Off"
+AimbotToggle.TextColor3 = Color3.fromRGB(255, 255, 255)
+AimbotToggle.BorderSizePixel = 0
+AimbotToggle.BackgroundTransparency = 0.5
+AimbotToggle.MouseButton1Click:Connect(function()
+    _G.AimbotEnabled = not _G.AimbotEnabled
+    AimbotToggle.Text = _G.AimbotEnabled and "Aimbot: On" or "Aimbot: Off"
+end)
+
+
 
 local SettingsLabel = Instance.new("TextLabel")
 SettingsLabel.Size = UDim2.new(0, 200, 0, 50)
@@ -238,6 +503,7 @@ SettingsLabel.BackgroundColor3 = Color3.fromRGB(25, 25, 25)
 SettingsLabel.TextColor3 = Color3.fromRGB(255, 255, 255)
 SettingsLabel.Text = "Settings:"
 SettingsLabel.Parent = SettingsPanel
+SettingsLabel.BackgroundTransparency = 0.5
 
 local TeleportationLabel = Instance.new("TextLabel")
 TeleportationLabel.Size = UDim2.new(0, 200, 0, 50)
@@ -246,6 +512,7 @@ TeleportationLabel.BackgroundColor3 = Color3.fromRGB(25, 25, 25)
 TeleportationLabel.TextColor3 = Color3.fromRGB(255, 255, 255)
 TeleportationLabel.Text = "ClickWarp:"
 TeleportationLabel.Parent = TeleportationPanel
+TeleportationLabel.BackgroundTransparency = 0.5
 
 local TeleportationToggleButton = Instance.new("TextButton")
 TeleportationToggleButton.Parent = TeleportationPanel
@@ -255,6 +522,7 @@ TeleportationToggleButton.BackgroundColor3 = Color3.fromRGB(65, 65, 65)
 TeleportationToggleButton.TextColor3 = Color3.fromRGB(255, 255, 255)
 TeleportationToggleButton.Text = "Активировать"
 TeleportationToggleButton.BorderSizePixel = 0
+TeleportationToggleButton.BackgroundTransparency = 0.5
 
 local WalkspeedLabel = Instance.new("TextLabel")
 WalkspeedLabel.Size = UDim2.new(0, 200, 0, 50)
@@ -263,6 +531,7 @@ WalkspeedLabel.BackgroundColor3 = Color3.fromRGB(25, 25, 25)
 WalkspeedLabel.TextColor3 = Color3.fromRGB(255, 255, 255)
 WalkspeedLabel.Text = "Walkspeed:"
 WalkspeedLabel.Parent = SettingsPanel
+WalkspeedLabel.BackgroundTransparency = 0.5
 
 local WalkspeedTextBox = Instance.new("TextBox")
 WalkspeedTextBox.Parent = SettingsPanel
@@ -272,6 +541,7 @@ WalkspeedTextBox.BackgroundColor3 = Color3.fromRGB(65, 65, 65)
 WalkspeedTextBox.TextColor3 = Color3.fromRGB(255, 255, 255)
 WalkspeedTextBox.Text = tostring(LocalPlayer.Character.Humanoid.WalkSpeed)
 WalkspeedTextBox.BorderSizePixel = 0
+WalkspeedTextBox.BackgroundTransparency = 0.5
 
 local JumppowerLabel = Instance.new("TextLabel")
 JumppowerLabel.Size = UDim2.new(0, 200, 0, 50)
@@ -280,6 +550,7 @@ JumppowerLabel.BackgroundColor3 = Color3.fromRGB(25, 25, 25)
 JumppowerLabel.TextColor3 = Color3.fromRGB(255, 255, 255)
 JumppowerLabel.Text = "Jumppower:"
 JumppowerLabel.Parent = SettingsPanel
+JumppowerLabel.BackgroundTransparency = 0.5
 
 local JumppowerTextBox = Instance.new("TextBox")
 JumppowerTextBox.Parent = SettingsPanel
@@ -289,23 +560,7 @@ JumppowerTextBox.BackgroundColor3 = Color3.fromRGB(65, 65, 65)
 JumppowerTextBox.TextColor3 = Color3.fromRGB(255, 255, 255)
 JumppowerTextBox.Text = tostring(LocalPlayer.Character.Humanoid.JumpPower)
 JumppowerTextBox.BorderSizePixel = 0
-
-local FlyspeedLabel = Instance.new("TextLabel")
-FlyspeedLabel.Size = UDim2.new(0, 200, 0, 50)
-FlyspeedLabel.Position = UDim2.new(0.25, 0, 0.7, 0)
-FlyspeedLabel.BackgroundColor3 = Color3.fromRGB(25, 25, 25)
-FlyspeedLabel.TextColor3 = Color3.fromRGB(255, 255, 255)
-FlyspeedLabel.Text = "FlySpeed:"
-FlyspeedLabel.Parent = SettingsPanel
-
-local FlyspeedTextBox = Instance.new("TextBox")
-FlyspeedTextBox.Parent = SettingsPanel
-FlyspeedTextBox.Size = UDim2.new(0, 100, 0, 30)
-FlyspeedTextBox.Position = UDim2.new(0.6, -50, 0.7, 0)
-FlyspeedTextBox.BackgroundColor3 = Color3.fromRGB(65, 65, 65)
-FlyspeedTextBox.TextColor3 = Color3.fromRGB(255, 255, 255)
-FlyspeedTextBox.Text = "50"  -- Начальное значение
-FlyspeedTextBox.BorderSizePixel = 0
+JumppowerTextBox.BackgroundTransparency = 0.5
 
 
 
@@ -338,6 +593,8 @@ JumppowerTextBox.FocusLost:Connect(function(enterPressed)
         end
     end
 end)
+
+
 
 
 -- Реализация функций для Fly, NoClip и ClickWarp
@@ -399,28 +656,37 @@ end
 
 
 
+local noClipConnections = {}
+
 local function setNoClip(enabled)
     local character = LocalPlayer.Character
     if character then
         if enabled then
-            -- Включить режим NoClip
-            RunService.Stepped:Connect(function()
+            -- Enable NoClip
+            local connection = RunService.Stepped:Connect(function()
                 for _, child in pairs(character:GetDescendants()) do
                     if child:IsA("BasePart") then
                         child.CanCollide = false
                     end
                 end
             end)
+            table.insert(noClipConnections, connection)
         else
-            -- Отключить режим NoClip
+            -- Disable NoClip
             for _, child in pairs(character:GetDescendants()) do
                 if child:IsA("BasePart") then
                     child.CanCollide = true
                 end
             end
+            -- Disconnect all Stepped connections
+            for _, connection in ipairs(noClipConnections) do
+                connection:Disconnect()
+            end
+            noClipConnections = {}  -- Clear the connections table
         end
     end
 end
+
 
 
 
